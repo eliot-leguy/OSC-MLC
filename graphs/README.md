@@ -1,1 +1,1 @@
-Results will be stored here.
+Graphs will be stored here.
