@@ -1,1 +1,1 @@
-truc bidule chouette
+Consumption results will be stored here.
