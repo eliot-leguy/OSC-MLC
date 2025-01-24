@@ -37,3 +37,4 @@ The "parameters.py" file must be updated with the algorithms that will be tested
 - 4_graph_generator : generates the result figures for online metrics
 - 5_CL_eval_process : generates the result figures for post-experience evaluation metrics
 - 6_table_generator : generates result tables and execute statistical tests
+- 7_speed_bench : execute speed learning evaluation
