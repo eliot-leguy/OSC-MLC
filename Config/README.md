@@ -1,1 +1,1 @@
-truc bidule chouette
+Configurations of models will be stored here.
