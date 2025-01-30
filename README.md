@@ -8,7 +8,7 @@ ___
 - Labels : contains the label signature of the tasks
 - Length : contains the length of the learning experiences
 - Orders : contains task orders for each stream
-- datasets
+- datasets : the dataset Mediamill is too heavy to be found in the repository, but can be found at https://www.uco.es/kdis/mllresources/
 
 ___
 
