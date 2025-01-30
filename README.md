@@ -1,4 +1,4 @@
-# Github repository and supplementary material of the article "Continual multi-label and multi-task learning for tabular data : proposal of a standardized protocol for task creation and classifier evaluation".
+# Github repository and supplementary material of the article "A standardized evaluation protocol for frugal continual multi-label and multi-task classifiers of tabular data".
 ___
 
 ## Data :
