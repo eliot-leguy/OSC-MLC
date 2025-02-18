@@ -220,7 +220,24 @@ def online_eval(
             print("{}".format(k) + " : " + "{}".format(online_metrics_dict[k].get()))
             metrics_online_results[k].append(online_metrics_dict[k].get())
         else:
-            online_metrics_dict[k].update(online_metrics_dict["macro_BA"].get())
+            for k_pred in y_pred.keys():
+                if y_pred[k_pred] == None or float(y_pred[k_pred]) < 0.5:
+                    y_pred[k_pred] = 0
+                elif float(y_pred[k_pred]) > 0.5:
+                    y_pred[k_pred] = 1
+            for k_pred in y.keys():
+                if k_pred not in y_pred:
+                    y_pred[k_pred] = 0
+            for k_pred in y_pred.keys():
+                if k_pred not in y:
+                    y[k_pred] = 0
+            masked_y = dict()
+            masked_y_pred = dict()
+            for k_y in y.keys():
+                if k_y in seen_task_labels:
+                    masked_y[k_y] = y[k_y]
+                    masked_y_pred[k_y] = y_pred[k_y]
+            online_metrics_dict[k].update(masked_y, masked_y_pred)
             print("{}".format(k) + " : " + "{}".format(online_metrics_dict[k].get()))
             metrics_online_results[k].append(online_metrics_dict[k].get())
 
