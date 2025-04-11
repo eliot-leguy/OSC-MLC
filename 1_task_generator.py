@@ -317,6 +317,15 @@ for k, v in datasets.items():
     # Importing the dataset
     print("Importing and preprocessing the dataset...")
 
+    # if k=="synthetic_monolab":
+    #     continue
+    # if k=="synthetic_bilab":
+    #     continue
+    # if k=="synthetic_rand":
+    #     continue
+    if k=="Mediamill":
+        continue
+
     assert isinstance(
         datasets[k], list
     ), "Label number not found in the datasets dictionnary from parameters file."
@@ -346,8 +355,17 @@ for k, v in datasets.items():
     # Making sure there is no null label vectors or null label column :
     label_count = null_processing(df_x, df_y, data, v[0])
 
+    # Check if there are enough samples for clustering
+    if df_y.shape[0] < nb_cluster:
+        print(f"Dataset {k} has only {df_y.shape[0]} samples after preprocessing, which is less than the number of clusters ({nb_cluster}). Skipping clustering for this dataset.")
+        continue
+
     # Converting label vectors from pandas dataframe to numpy array :
     data_y = df_y.to_numpy()
+
+    print("Dataset : {}".format(k))
+    print("Number of labels : {}".format(v[0]))
+
 
     # Clustering :
     print("Clustering...")

@@ -84,6 +84,7 @@ class NN_TL_classifier(base.MultiLabelClassifier):
         # operations avec calcul de gradient par pytorch
         self.optimizer.zero_grad()
         outputs = self.model(new_x)
+        mask = mask.to(outputs.device)  # Move mask to the same device as outputs (e.g., cuda:0)
         masked_outputs = outputs * mask
         loss = self.loss_fn(masked_outputs, new_y)
         loss.backward()

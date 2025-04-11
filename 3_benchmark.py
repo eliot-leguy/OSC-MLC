@@ -24,6 +24,9 @@ import implemented_models.NN_TLH_fifo
 import implemented_models.NN_TLH_sampling
 import implemented_models.NN_TLH_memories
 import implemented_models.NN_TLH_mini_memories
+import implemented_models.NN_TLH_attention
+import implemented_models.NN_HybridAdaptive
+import implemented_models.Ensemble_MLC
 import implemented_models.binary_relevance
 import implemented_models.baseline_1_NN
 import random
@@ -201,6 +204,16 @@ def online_eval(
         metrics_online_results (dict): dict containing the online metrics results
     """
     for k in online_metrics_dict.keys():
+        #TODO remove
+        # try:
+        #     result = online_metrics_dict[k].get()
+        #     if result is None:
+        #         print(f"{k}: No data available yet")
+        #     else:
+        #         print(f"{k} : {result}")
+        # except Exception as e:
+        #     print(f"Warning: Could not retrieve metric for {k}. Error: {e}")
+            
         if k == "RMSE" or k == "precisionatk":
             for k_pred in y.keys():
                 if k_pred not in y_pred:
@@ -216,8 +229,19 @@ def online_eval(
                 if k_y in cluster_label_signature["Cluster {}".format(task)]:
                     masked_y[k_y] = y[k_y]
                     masked_y_pred[k_y] = y_pred[k_y]
+            #TODO remove
+            # print(f"Processing metric: {k}")
+            # print(f"masked_y: {masked_y}, masked_y_pred: {masked_y_pred}")
+
+            # Check if update() is being called
+            if masked_y and masked_y_pred:
+                online_metrics_dict[k].update(masked_y, masked_y_pred)
+            else:
+                print(f"Skipping update for {k} - Empty masked_y or masked_y_pred")
+
+
             online_metrics_dict[k].update(masked_y, masked_y_pred)
-            print("{}".format(k) + " : " + "{}".format(online_metrics_dict[k].get()))
+            # print("{}".format(k) + " : " + "{}".format(online_metrics_dict[k].get()))
             metrics_online_results[k].append(online_metrics_dict[k].get())
         else:
             for k_pred in y_pred.keys():
@@ -234,18 +258,31 @@ def online_eval(
             masked_y = dict()
             masked_y_pred = dict()
             for k_y in y.keys():
-                if k_y in seen_task_labels:
+                if k_y in cluster_label_signature["Cluster {}".format(task)]:
                     masked_y[k_y] = y[k_y]
                     masked_y_pred[k_y] = y_pred[k_y]
+
+            #TODO remove
+            # print(f"Processing metric: {k}")
+            # print(f"masked_y: {masked_y}, masked_y_pred: {masked_y_pred}")
+
+            # Check if update() is being called
+            if masked_y and masked_y_pred:
+                online_metrics_dict[k].update(masked_y, masked_y_pred)
+            else:
+                print(f"Skipping update for {k} - Empty masked_y or masked_y_pred")
             online_metrics_dict[k].update(masked_y, masked_y_pred)
-            print("{}".format(k) + " : " + "{}".format(online_metrics_dict[k].get()))
+            # print("{}".format(k) + " : " + "{}".format(online_metrics_dict[k].get()))
             metrics_online_results[k].append(online_metrics_dict[k].get())
 
 
 def first_exp_HPO(model_test, full_stream, v_data, cluster_label_signature):
     hpo_accuracy = metrics.multioutput.MacroAverage(metrics.BalancedAccuracy())
-    X_frame = full_stream["0"][1].iloc[:, : (-1) * (v_data[0])]
-    Y_frame = full_stream["0"][1].iloc[:, (-1) * (v_data[0]) :]
+    if not full_stream:
+        raise ValueError("full_stream is empty; no data to process")
+    first_key = next(iter(full_stream)) 
+    X_frame = full_stream[first_key][1].iloc[:, : (-1) * (v_data[0])]
+    Y_frame = full_stream[first_key][1].iloc[:, (-1) * (v_data[0]) :]
 
     # Initializing the code carbon tracker
     tracker = OfflineEmissionsTracker(
@@ -283,6 +320,8 @@ def first_exp_HPO(model_test, full_stream, v_data, cluster_label_signature):
             or m == "NN_TLH_sampling"
             or m == "NN_TLH_memories"
             or m == "NN_TLH_mini_memories"
+            or m == "NN_TLH_attention"
+            or m == "NN_HybridAdaptive"
         ):
             model_test.learn_one(
                 x,
@@ -293,8 +332,8 @@ def first_exp_HPO(model_test, full_stream, v_data, cluster_label_signature):
             model_test.learn_one(x, y)
     tracker.stop()
     frugality = hpo_accuracy.get() - (1 / (1 + (1 / tracker._total_cpu_energy.kWh)))
-    print("Accuracy : {}".format(hpo_accuracy.get()))
-    print("Frugalité : {}".format(tracker._total_cpu_energy.kWh))
+    # print("Accuracy : {}".format(hpo_accuracy.get()))
+    # print("Frugalité : {}".format(tracker._total_cpu_energy.kWh))
     return frugality
 
 
@@ -359,16 +398,16 @@ def continual_eval(
     continual_metrics_dict[
         "continual_macro_BA_cluster_{}_".format(cl) + "round_{}".format(iter_continual)
     ].update(masked_y, masked_y_pred)
-    print(
-        "continual_macro_BA_cluster_{}".format(cl)
-        + " : "
-        + "{}".format(
-            continual_metrics_dict[
-                "continual_macro_BA_cluster_{}_".format(cl)
-                + "round_{}".format(iter_continual)
-            ].get()
-        )
-    )
+    # print(
+    #     "continual_macro_BA_cluster_{}".format(cl)
+    #     + " : "
+    #     + "{}".format(
+    #         continual_metrics_dict[
+    #             "continual_macro_BA_cluster_{}_".format(cl)
+    #             + "round_{}".format(iter_continual)
+    #         ].get()
+    #     )
+    # )
 
 
 def continual_results_saving(
@@ -443,6 +482,10 @@ for k_data, v_data in datasets.items():
     # Getting ordering :
     cluster_order = get_ordering(k_data, workdir, scenario)
 
+    if not cluster_order:
+        print(f"Warning: cluster_order is empty for {k_data}, {scenario}. Skipping.")
+        continue  # Skip to the next dataset in the loop
+
     # Getting label signature of each cluster :
     cluster_label_signature = get_label_signature(k_data, workdir)
 
@@ -494,6 +537,20 @@ for k_data, v_data in datasets.items():
                 "size_replay_sampling": [100, 1000],
                 "replay_sampling": [5, 10],
             },
+            "NN_TLH_attention": {
+                "learning_rate": [0.1, 0.01, 0.001],
+                "hidden_sizes": [200, 2000],
+                "size_replay": [100, 1000],
+                "replay_k": [5, 10],
+            },
+            "NN_HybridAdaptive": {
+                "learning_rate": [0.01, 0.001],
+                "hidden1": [200, 400],
+                "hidden2": [200],
+                "size_fifo": [500, 1000],
+                "size_reservoir": [500, 1000],
+                "replay_samples": [5, 10],
+            },
             "BR_HT": {
                 "grace_period": [100, 200],
                 "delta": [1e-06, 1e-07],
@@ -529,11 +586,61 @@ for k_data, v_data in datasets.items():
                 "eucli": [True, False],
                 "max_window_size": [0, 10, 100, 1000],
             },
+            "Ensemble_MLC": {},
         }
 
-        best_config = [0, 0, 0]
+        best_config = [-float('inf'), 0, 0]
         list_config = ParameterGrid(models_parameter[m])
         nb_config = 10
+
+        if m == "Ensemble_MLC":
+            # Load best configurations for sub-models
+            with open(workdir + "Config/{}_NN_TLH_attention_{}.json".format(k_data, scenario), "r") as f:
+                config_nn_tlh_attention = json.load(f)
+            with open(workdir + "Config/{}_NN_TLH_mini_memories_{}.json".format(k_data, scenario), "r") as f:
+                config_nn_tlh_mini_memories = json.load(f)
+            with open(workdir + "Config/{}_BR_random_forest_{}.json".format(k_data, scenario), "r") as f:
+                config_br_random_forest = json.load(f)
+
+            # Initialize sub-models with best configurations
+            model_nn_tlh_attention = implemented_models.NN_TLH_attention.NN_TLH_attention(
+                learning_rate=config_nn_tlh_attention["learning_rate"],
+                feature_size=v_data[1],
+                hidden_sizes=config_nn_tlh_attention["hidden_sizes"],
+                size_replay=config_nn_tlh_attention["size_replay"],
+                replay_k=config_nn_tlh_attention["replay_k"],
+                label_size=v_data[0],
+            )
+            model_nn_tlh_mini_memories = implemented_models.NN_TLH_mini_memories.NN_TLH_mini_memories_classifier(
+                learning_rate=config_nn_tlh_mini_memories["learning_rate"],
+                feature_size=v_data[1],
+                hidden_sizes=config_nn_tlh_mini_memories["hidden_sizes"],
+                size_replay_fifo=config_nn_tlh_mini_memories["size_replay_fifo"],
+                replay_fifo=config_nn_tlh_mini_memories["replay_fifo"],
+                size_replay_sampling=config_nn_tlh_mini_memories["size_replay_sampling"],
+                replay_sampling=config_nn_tlh_mini_memories["replay_sampling"],
+                label_size=v_data[0],
+            )
+            model_br_random_forest = implemented_models.binary_relevance.binary_relevance(
+                forest.ARFClassifier(
+                    n_models=config_br_random_forest["n_models"],
+                    grace_period=config_br_random_forest["grace_period"],
+                    delta=config_br_random_forest["delta"],
+                    tau=config_br_random_forest["tau"],
+                )
+            )
+
+            # Create ensemble model
+            ensemble_model = implemented_models.Ensemble_MLC.EnsembleMultiLabelClassifier(
+                models=[
+                    (model_nn_tlh_attention, True),      # Requires signature
+                    (model_nn_tlh_mini_memories, True),  # Requires signature
+                    (model_br_random_forest, False),     # Does not require signature
+                ]
+            )
+
+            # Set best_config without HPO
+            best_config = [0, {}, ensemble_model]
 
         if nb_config < len(list_config):
             g = 0
@@ -709,6 +816,51 @@ for k_data, v_data in datasets.items():
                                     replay_sampling=config["replay_sampling"],
                                 ),
                             ]
+                    if m == "NN_TLH_attention":
+                        # e.g. for each combination of hyperparams:
+                        model_test = implemented_models.NN_TLH_attention.NN_TLH_attention_classifier(
+                            learning_rate=config["learning_rate"],
+                            feature_size=v_data[1],
+                            hidden_sizes=config["hidden_sizes"],
+                            label_size=v_data[0],
+                            size_replay=config["size_replay"],
+                            replay_k=config["replay_k"],
+                        )
+
+                        candidate_accuracy = first_exp_HPO(
+                            model_test, full_stream, v_data, cluster_label_signature
+                        )
+
+                        if best_config[0] < candidate_accuracy:
+                            best_config = [
+                                candidate_accuracy,
+                                config,
+                                implemented_models.NN_TLH_attention.NN_TLH_attention_classifier(
+                                    learning_rate=config["learning_rate"],
+                                    feature_size=v_data[1],
+                                    hidden_sizes=config["hidden_sizes"],
+                                    label_size=v_data[0],
+                                    size_replay=config["size_replay"],
+                                    replay_k=config["replay_k"],
+                                ),
+                            ]
+                    elif m == "NN_HybridAdaptive":
+                        model_test = implemented_models.NN_HybridAdaptive.NN_HybridAdaptive_classifier(
+                            learning_rate=config["learning_rate"],
+                            feature_size=v_data[1],
+                            label_size=v_data[0],
+                            hidden1=config["hidden1"],
+                            hidden2=config["hidden2"],
+                            size_fifo=config["size_fifo"],
+                            size_reservoir=config["size_reservoir"],
+                            replay_samples=config["replay_samples"],
+                        )
+
+                        candidate_accuracy = first_exp_HPO(model_test, full_stream, v_data, cluster_label_signature)
+
+                        if best_config[0] < candidate_accuracy:
+                            best_config = [candidate_accuracy, config, model_test]
+
                     elif m == "BR_HT":
                         model_test = (
                             implemented_models.binary_relevance.binary_relevance(
@@ -1024,6 +1176,50 @@ for k_data, v_data in datasets.items():
                                 replay_sampling=config["replay_sampling"],
                             ),
                         ]
+                elif m == "NN_TLH_attention":
+                        # e.g. for each combination of hyperparams:
+                        model_test = implemented_models.NN_TLH_attention.NN_TLH_attention_classifier(
+                            learning_rate=config["learning_rate"],
+                            feature_size=v_data[1],
+                            hidden_sizes=config["hidden_sizes"],
+                            label_size=v_data[0],
+                            size_replay=config["size_replay"],
+                            replay_k=config["replay_k"],
+                        )
+
+                        candidate_accuracy = first_exp_HPO(
+                            model_test, full_stream, v_data, cluster_label_signature
+                        )
+
+                        if best_config[0] < candidate_accuracy:
+                            best_config = [
+                                candidate_accuracy,
+                                config,
+                                implemented_models.NN_TLH_attention.NN_TLH_attention_classifier(
+                                    learning_rate=config["learning_rate"],
+                                    feature_size=v_data[1],
+                                    hidden_sizes=config["hidden_sizes"],
+                                    label_size=v_data[0],
+                                    size_replay=config["size_replay"],
+                                    replay_k=config["replay_k"],
+                                ),
+                            ]
+                elif m == "NN_HybridAdaptive":
+                    model_test = implemented_models.NN_HybridAdaptive.NN_HybridAdaptive_classifier(
+                        learning_rate=config["learning_rate"],
+                        feature_size=v_data[1],
+                        label_size=v_data[0],
+                        hidden1=config["hidden1"],
+                        hidden2=config["hidden2"],
+                        size_fifo=config["size_fifo"],
+                        size_reservoir=config["size_reservoir"],
+                        replay_samples=config["replay_samples"],
+                    )
+
+                    candidate_accuracy = first_exp_HPO(model_test, full_stream, v_data, cluster_label_signature)
+
+                    if best_config[0] < candidate_accuracy:
+                        best_config = [candidate_accuracy, config, model_test]
                 elif m == "BR_HT":
                     model_test = implemented_models.binary_relevance.binary_relevance(
                         model=tree.HoeffdingTreeClassifier(
@@ -1250,6 +1446,11 @@ for k_data, v_data in datasets.items():
             if time.time() - time_start > 28800:
                 break
             if v_stream[0] not in seen_clusters:
+                # NEW LINES: Extend seen_labels with the newly encountered cluster’s labels
+                seen_labels.extend(cluster_label_signature[f"Cluster {v_stream[0]}"])
+                # Drop duplicates if needed
+                seen_labels = list(set(seen_labels))
+
                 seen_clusters.append(v_stream[0])
             X_frame = v_stream[1].iloc[:, : (-1) * (v_data[0])]
             Y_frame = v_stream[1].iloc[:, (-1) * (v_data[0]) :]
@@ -1278,6 +1479,8 @@ for k_data, v_data in datasets.items():
                     or m == "NN_TLH_sampling"
                     or m == "NN_TLH_memories"
                     or m == "NN_TLH_mini_memories"
+                    or m == "NN_TLH_attention"
+                    or m == "NN_HybridAdaptive"
                 ):
                     model_final.learn_one(
                         x,

@@ -127,6 +127,13 @@ def get_results(
     Returns:
         step (list): list containing the results for the given parameters
     """
+    print(workdir
+        + "results/{}_".format(data)
+        + "{}_".format(m)
+        + "{}_continual_".format(scenario)
+        + "{}_results".format(ordering)
+        + ".json")
+
     if os.path.isfile(
         workdir
         + "results/{}_".format(data)
@@ -147,6 +154,8 @@ def get_results(
         ) as json_file:
             continual_results = json.load(json_file)
         return continual_results
+    else:
+        print(f"File not found: {workdir}results/{data}_{m}_{scenario}_{ordering}_results.json")
 
 
 def get_ordering(ordering: str, workdir: str, data: str):
@@ -358,6 +367,7 @@ nb_cluster = cluster_count(nb_clusters, workdir, data)
 for m in models:
     results = dict()
     continual_results = get_results(scenario, workdir, data, m, ordering, results)
+    print(continual_results)
 
     ### Preparing the numpy array matrix :
     continual_metrics_dict = dict()

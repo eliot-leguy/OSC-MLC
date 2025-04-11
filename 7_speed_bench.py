@@ -25,6 +25,8 @@ import implemented_models.NN_TLH_memories
 import implemented_models.NN_TLH_mini_memories
 import implemented_models.binary_relevance
 import implemented_models.baseline_1_NN
+import implemented_models.NN_HybridAdaptive
+import implemented_models.NN_TLH_attention
 import random
 import argparse
 import json
@@ -107,7 +109,7 @@ def online_eval(
             masked_y[k_y] = y[k_y]
             masked_y_pred[k_y] = y_pred[k_y]
     accuracy.update(masked_y, masked_y_pred)
-    print("Macro_BA : " + "{}".format(accuracy.get()))
+    # print("Macro_BA : " + "{}".format(accuracy.get()))
     results["acc_results"].append(accuracy.get())
 
 
@@ -152,6 +154,8 @@ def first_exp_HPO(model_test, rng, cluster_label_signature):
             or m == "NN_TLH_sampling"
             or m == "NN_TLH_memories"
             or m == "NN_TLH_mini_memories"
+            or m == "NN_TLH_attention"
+            or m == "NN_HybridAdaptive"
         ):
             model_test.learn_one(
                 x,
@@ -243,6 +247,20 @@ for m in models:
             "replay_fifo": [5, 10],
             "size_replay_sampling": [100, 1000],
             "replay_sampling": [5, 10],
+        },
+        "NN_TLH_attention": {
+            "learning_rate": [0.1, 0.01, 0.001],
+            "hidden_sizes": [200, 2000],
+            "size_replay": [100, 1000],
+            "replay_k": [5, 10],
+        },
+        "NN_HybridAdaptive": {
+            "learning_rate": [0.01, 0.001],
+            "hidden1": [200, 400],
+            "hidden2": [200],
+            "size_fifo": [500, 1000],
+            "size_reservoir": [500, 1000],
+            "replay_samples": [5, 10],
         },
         "BR_HT": {
             "grace_period": [100, 200],
@@ -597,6 +615,56 @@ for m in models:
                                 feature_size=100,
                             ),
                         ]
+                elif m == "NN_HybridAdaptive":
+                    model_test = implemented_models.NN_HybridAdaptive.NN_HybridAdaptive(
+                        learning_rate=config["learning_rate"],
+                        feature_size=100,
+                        label_size=10,
+                        hidden1=config["hidden1"],
+                        hidden2=config["hidden2"],
+                        size_fifo=config["size_fifo"],
+                        size_reservoir=config["size_reservoir"],
+                        replay_samples=config["replay_samples"],
+                    )
+                    candidate_accuracy = first_exp_HPO(model_test, rng, task_1_signature)
+                    if best_config[0] < candidate_accuracy:
+                        best_config = [
+                            candidate_accuracy,
+                            config,
+                            implemented_models.NN_HybridAdaptive.NN_HybridAdaptive(
+                                learning_rate=config["learning_rate"],
+                                feature_size=100,
+                                label_size=10,
+                                hidden1=config["hidden1"],
+                                hidden2=config["hidden2"],
+                                size_fifo=config["size_fifo"],
+                                size_reservoir=config["size_reservoir"],
+                                replay_samples=config["replay_samples"],
+                            ),
+                        ]
+                elif m == "NN_TLH_attention":
+                    model_test = implemented_models.NN_TLH_attention.NN_TLH_attention(
+                        learning_rate=config["learning_rate"],
+                        feature_size=100,
+                        hidden_sizes=config["hidden_sizes"],
+                        size_replay=config["size_replay"],
+                        replay_k=config["replay_k"],
+                        label_size=10,
+                    )
+                    candidate_accuracy = first_exp_HPO(model_test, rng, task_1_signature)
+                    if best_config[0] < candidate_accuracy:
+                        best_config = [
+                            candidate_accuracy,
+                            config,
+                            implemented_models.NN_TLH_attention.NN_TLH_attention(
+                                learning_rate=config["learning_rate"],
+                                feature_size=100,
+                                hidden_sizes=config["hidden_sizes"],
+                                size_replay=config["size_replay"],
+                                replay_k=config["replay_k"],
+                                label_size=10,
+                            ),
+                        ]
             g += 1
 
     else:
@@ -906,6 +974,56 @@ for m in models:
                             label_size=10,
                         ),
                     ]
+            elif m == "NN_HybridAdaptive":
+                model_test = implemented_models.NN_HybridAdaptive(
+                    learning_rate=config["learning_rate"],
+                    feature_size=100,
+                    label_size=10,
+                    hidden1=config["hidden1"],
+                    hidden2=config["hidden2"],
+                    size_fifo=config["size_fifo"],
+                    size_reservoir=config["size_reservoir"],
+                    replay_samples=config["replay_samples"],
+                )
+                candidate_accuracy = first_exp_HPO(model_test, rng, task_1_signature)
+                if best_config[0] < candidate_accuracy:
+                    best_config = [
+                        candidate_accuracy,
+                        config,
+                        implemented_models.NN_HybridAdaptive(
+                            learning_rate=config["learning_rate"],
+                            feature_size=100,
+                            label_size=10,
+                            hidden1=config["hidden1"],
+                            hidden2=config["hidden2"],
+                            size_fifo=config["size_fifo"],
+                            size_reservoir=config["size_reservoir"],
+                            replay_samples=config["replay_samples"],
+                        ),
+                    ]
+            elif m == "NN_TLH_attention":
+                model_test = implemented_models.NN_TLH_attention(
+                    learning_rate=config["learning_rate"],
+                    feature_size=100,
+                    hidden_sizes=config["hidden_sizes"],
+                    size_replay=config["size_replay"],
+                    replay_k=config["replay_k"],
+                    label_size=10,
+                )
+                candidate_accuracy = first_exp_HPO(model_test, rng, task_1_signature)
+                if best_config[0] < candidate_accuracy:
+                    best_config = [
+                        candidate_accuracy,
+                        config,
+                        implemented_models.NN_TLH_attention(
+                            learning_rate=config["learning_rate"],
+                            feature_size=100,
+                            hidden_sizes=config["hidden_sizes"],
+                            size_replay=config["size_replay"],
+                            replay_k=config["replay_k"],
+                            label_size=10,
+                        ),
+                    ]
 
     with open(
         workdir + "Config/Speed_bench_{}.json".format(m),
@@ -949,6 +1067,8 @@ for m in models:
         or m == "NN_TLH_sampling"
         or m == "NN_TLH_memories"
         or m == "NN_TLH_mini_memories"
+        or m == "NN_TLH_attention"
+        or m == "NN_HybridAdaptive"
     ):
         model_final.learn_one(
             x,
@@ -986,6 +1106,8 @@ for m in models:
             or m == "NN_TLH_sampling"
             or m == "NN_TLH_memories"
             or m == "NN_TLH_mini_memories"
+            or m == "NN_TLH_attention"
+            or m == "NN_HybridAdaptive"
         ):
             model_final.learn_one(
                 x,
@@ -1023,6 +1145,8 @@ for m in models:
             or m == "NN_TLH_sampling"
             or m == "NN_TLH_memories"
             or m == "NN_TLH_mini_memories"
+            or m == "NN_TLH_attention"
+            or m == "NN_HybridAdaptive"
         ):
             model_final.learn_one(
                 x,

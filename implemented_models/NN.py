@@ -54,6 +54,9 @@ class NN_classifier(base.MultiLabelClassifier):
         )
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(self.device)
+        print(f"NN_classifier initialized with feature_size={feature_size}, label_size={label_size}")
+
+
 
     def learn_one(self, features, labels):
         if type(labels) != dict:
@@ -65,12 +68,12 @@ class NN_classifier(base.MultiLabelClassifier):
             features[key] = float(value)
             k = int(
                 re.findall(r"\d+", key)[0]
-            )  # "X49" -> "49". # = key pour le fichier test
+            ) -1 # "X49" -> "49". # = key pour le fichier test
             new_x[k] = value
         new_x = torch.tensor(new_x, dtype=torch.float32).to(self.device)
         new_y = numpy.zeros(self.label_size)
         for key, value in labels.items():
-            k = int(re.findall(r"\d+", key)[0])
+            k = int(re.findall(r"\d+", key)[0]) -1
             new_y[k] = value
         new_y = torch.tensor(new_y, dtype=torch.float32).to(self.device)
         self.optimizer.zero_grad()
@@ -85,7 +88,7 @@ class NN_classifier(base.MultiLabelClassifier):
             features[key] = float(value)
             k = int(
                 re.findall(r"\d+", key)[0]
-            )  # "X49" -> "49". # = key pour le fichier test
+            ) -1 # "X49" -> "49". # = key pour le fichier test
             new_x[k] = value
         new_x = torch.tensor(new_x, dtype=torch.float32).to(self.device)
         with torch.no_grad():

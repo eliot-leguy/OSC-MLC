@@ -181,6 +181,7 @@ class NN_TLH_mini_memories_classifier(base.MultiLabelClassifier):
 
         self.optimizer.zero_grad()
         outputs = self.model(features_tensor)
+        # mask = mask.to(outputs.device)  # Move mask to the same device as outputs (e.g., cuda:0)
         masked_outputs = outputs * mask_tensor
         loss = self.loss_fn(masked_outputs, labels_tensor)
         loss.backward()

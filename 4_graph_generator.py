@@ -39,23 +39,26 @@ models = bench.models
 workdir = bench.workdir
 
 color_list = [
-    "deepskyblue",
-    "steelblue",
-    "aqua",
-    "darkturquoise",
-    "royalblue",
-    "lightsteelblue",
-    "dodgerblue",
-    "limegreen",
-    "green",
-    "lightgreen",
-    "yellowgreen",
-    "olivedrab",
-    "red",
-    "salmon",
-    "orangered",
-    "tomato",
-    "lightcoral",
+    "#1f77b4",  # Blue
+    "#ff7f0e",  # Orange
+    "#2ca02c",  # Green
+    "#d62728",  # Red
+    "#9467bd",  # Purple
+    "#8c564b",  # Brown
+    "#e377c2",  # Pink
+    "#7f7f7f",  # Gray
+    "#bcbd22",  # Yellow-Green
+    "#17becf",  # Teal
+    "#aec7e8",  # Light Blue
+    "#ffbb78",  # Light Orange
+    "#98df8a",  # Light Green
+    "#ff9896",  # Light Red
+    "#c5b0d5",  # Light Purple
+    "#c49c94",  # Light Brown
+    "#f7b6d2",  # Light Pink
+    "#c7c7c7",  # Light Gray
+    "#dbdb8d",  # Light Yellow-Green
+    "#9edae5",  # Light Teal
 ]
 
 style_list = [
@@ -122,6 +125,8 @@ def set_online_results(
         )
         for col_name in online.keys():
             metrics.append(col_name)
+    else:
+        print(f"File not found: {workdir}results/{data}_{model}_{scenario}_{ordering}_results.json")
     return metrics
 
 
@@ -189,6 +194,8 @@ def get_results(
         results[m] = new_data
         step = new_data.index.values.tolist()
         return step
+    else:
+        print(f"File not found: {workdir}results/{data}_{m}_{scenario}_{ordering}_results.json")
 
 
 def set_title(e: str, data: str, ordering: str, scenario: str):

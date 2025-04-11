@@ -95,121 +95,88 @@ coord_time = {}
 for metric in metrics_online:
     print(metric)
     metric_dict = {}
-    intermediary_res = {}
-    for m in models:
-        intermediary_res[m] = []
+    intermediary_res = {m: [] for m in models}
+    datasets_with_data = []  # Track datasets with available files
+
     for set_data in datasets:
-        with open(
-            workdir
-            + "results/{}_tab_online_".format(set_data)
-            + "{}.json".format(metric),
-            "r",
-            encoding="utf-8",
-        ) as json_file:
-            file = json.load(json_file)
-        print(set_data)
-        print(file)
-        for tested_model in models:
-            intermediary_res[tested_model].append(file[tested_model])
-
-    for m in models:
-        sum = 0
-        metric_count = 0
-        for i in intermediary_res[m]:
-            intermediary_res[m][metric_count] = float(i)
-            sum += float(i)
-            metric_count += 1
-        if metric_count != 0:
-            mean = sum / metric_count
+        file_path = workdir + "results/{}_tab_online_{}.json".format(set_data, metric)
+        if os.path.exists(file_path):
+            with open(file_path, "r", encoding="utf-8") as json_file:
+                file = json.load(json_file)
+            for tested_model in models:
+                value = file.get(tested_model, 0)
+                try:
+                    intermediary_res[tested_model].append(float(value))
+                except (ValueError, TypeError):
+                    print(f"Warning: Non-numeric value '{value}' for model {tested_model} in dataset {set_data}. Using 0.")
+                    intermediary_res[tested_model].append(0.0)
+            datasets_with_data.append(set_data)
         else:
-            mean = 0
-        intermediary_res[m].append(mean)
+            print("No file for {}".format(set_data))
 
-    metric_dict = intermediary_res
-    metric_df = pd.DataFrame(metric_dict)
-    metric_df.insert(
-        0,
-        "Datasets",
-        [
-            "synthetic_monolab",
-            "synthetic_bilab",
-            "synthetic_rand",
-            "Scene",
-            "Yeast",
-            "Slashdot",
-            "Reuters-K500",
-            "20NG",
-            "Mediamill",
-            "Avg. value",
-        ],
-    )
-    metric_df.set_index("Datasets", inplace=True)
-    metric_df = metric_df.T
+    if datasets_with_data:  # Proceed only if some data was found
+        for m in models:
+            if intermediary_res[m]:
+                values = [float(i) for i in intermediary_res[m]]
+                mean = sum(values) / len(values)
+            else:
+                mean = 0
+            intermediary_res[m].append(mean)
 
-    rank_df = metric_df.rank(method="dense", ascending=False).astype(int)
-    metric_df = pd.concat([metric_df, rank_df.mean(axis=1)], axis=1).rename(
-        columns={0: "Avg. Rank"}
-    )
-    with open("results/{}_table.tex".format(metric), "w", encoding="utf-8") as f:
-        f.write(metric_df.to_latex(index=True))
+        metric_df = pd.DataFrame(intermediary_res)
+        # Use only datasets with data, plus "Avg. value"
+        metric_df.insert(0, "Datasets", datasets_with_data + ["Avg. value"])
+        metric_df.set_index("Datasets", inplace=True)
+        metric_df = metric_df.T
 
-    # Statistical tests
+        print(metric_df.head())
 
-    # Nemenyi
-    cd = utils.compute_CD(
-        metric_df["Avg. Rank"].to_list(),
-        7,
-        alpha=0.05,
-    )  # tested on 7 datasets
-    utils.graph_ranks(
-        metric_df["Avg. Rank"].to_list(),
-        metric_df["Avg. Rank"].index.to_list(),
-        cd=cd,
-        width=10,
-        textspace=1.5,
-        filename="graphs/Critical_diagram_{}.png".format(metric),
-    )
+        rank_df = metric_df.rank(method="dense", ascending=False).astype(int)
+        metric_df = pd.concat([metric_df, rank_df.mean(axis=1)], axis=1).rename(
+            columns={0: "Avg. Rank"}
+        )
+        with open("results/{}_table.tex".format(metric), "w", encoding="utf-8") as f:
+            f.write(metric_df.to_latex(index=True))
 
-    # Friedman and Kruskal-Wallis H-test
-    metric_dict = metric_df.T.to_dict(orient="list")
-    NN_test = metric_dict["NN"][0:-2]
-    NN_TL_test = metric_dict["NN_TL"][0:-2]
-    NN_TLH_test = metric_dict["NN_TLH"][0:-2]
-    NN_TLH_sampling_test = metric_dict["NN_TLH_sampling"][0:-2]
-    NN_TLH_fifo_test = metric_dict["NN_TLH_fifo"][0:-2]
-    NN_TLH_memories_test = metric_dict["NN_TLH_memories"][0:-2]
-    NN_TLH_mini_memories_test = metric_dict["NN_TLH_mini_memories"][0:-2]
-    BR_HT_test = metric_dict["BR_HT"][0:-2]
-    LC_HT_test = metric_dict["LC_HT"][0:-2]
-    CC_HT_test = metric_dict["CC_HT"][0:-2]
-    BR_random_forest_test = metric_dict["BR_random_forest"][0:-2]
-    iSOUPtree_test = metric_dict["iSOUPtree"][0:-2]
-    baseline_last_class_test = metric_dict["baseline_last_class"][0:-2]
-    baseline_prior_distribution_test = metric_dict["baseline_prior_distribution"][0:-2]
-    baseline_mean_test = metric_dict["baseline_mean"][0:-2]
-    baseline_oracle_test = metric_dict["baseline_oracle"][0:-2]
-    baseline_1_NN_test = metric_dict["baseline_1_NN"][0:-2]
-    friedman_results = stats.friedmanchisquare(
-        NN_test,
-        NN_TL_test,
-        NN_TLH_test,
-        NN_TLH_sampling_test,
-        NN_TLH_fifo_test,
-        NN_TLH_memories_test,
-        NN_TLH_mini_memories_test,
-        BR_HT_test,
-        LC_HT_test,
-        CC_HT_test,
-        BR_random_forest_test,
-        iSOUPtree_test,
-        baseline_last_class_test,
-        baseline_prior_distribution_test,
-        baseline_mean_test,
-        baseline_oracle_test,
-        baseline_1_NN_test,
-    )
-    data = np.array(
-        [
+        # Statistical tests
+
+        # Nemenyi
+        # cd = utils.compute_CD(
+        #     metric_df["Avg. Rank"].to_list(),
+        #     7,
+        #     alpha=0.05,
+        # )  # tested on 7 datasets
+        # utils.graph_ranks(
+        #     metric_df["Avg. Rank"].to_list(),
+        #     metric_df["Avg. Rank"].index.to_list(),
+        #     cd=cd,
+        #     width=10,
+        #     textspace=1.5,
+        #     filename="graphs/Critical_diagram_{}.png".format(metric),
+        # )
+
+        # Friedman and Kruskal-Wallis H-test
+        print(metric_df)
+        metric_dict = metric_df.T.to_dict(orient="list")
+        print(metric_dict)
+        NN_test = metric_dict["NN"][0:-2]
+        NN_TL_test = metric_dict["NN_TL"][0:-2]
+        NN_TLH_test = metric_dict["NN_TLH"][0:-2]
+        NN_TLH_sampling_test = metric_dict["NN_TLH_sampling"][0:-2]
+        NN_TLH_fifo_test = metric_dict["NN_TLH_fifo"][0:-2]
+        NN_TLH_memories_test = metric_dict["NN_TLH_memories"][0:-2]
+        NN_TLH_mini_memories_test = metric_dict["NN_TLH_mini_memories"][0:-2]
+        BR_HT_test = metric_dict["BR_HT"][0:-2]
+        LC_HT_test = metric_dict["LC_HT"][0:-2]
+        CC_HT_test = metric_dict["CC_HT"][0:-2]
+        BR_random_forest_test = metric_dict["BR_random_forest"][0:-2]
+        iSOUPtree_test = metric_dict["iSOUPtree"][0:-2]
+        baseline_last_class_test = metric_dict["baseline_last_class"][0:-2]
+        baseline_prior_distribution_test = metric_dict["baseline_prior_distribution"][0:-2]
+        baseline_mean_test = metric_dict["baseline_mean"][0:-2]
+        baseline_oracle_test = metric_dict["baseline_oracle"][0:-2]
+        baseline_1_NN_test = metric_dict["baseline_1_NN"][0:-2]
+        friedman_results = stats.friedmanchisquare(
             NN_test,
             NN_TL_test,
             NN_TLH_test,
@@ -227,13 +194,35 @@ for metric in metrics_online:
             baseline_mean_test,
             baseline_oracle_test,
             baseline_1_NN_test,
-        ]
-    )
-    nemenyi_results = sp.posthoc_nemenyi(data)
-    np.savetxt("results/Nemenyi_{}.txt".format(metric), nemenyi_results)
-    output_file = workdir + "results/Friedman_{}.json".format(metric)
-    with open(output_file, "w") as outfile:
-        json.dump(friedman_results, outfile)
+        )
+        data = np.array(
+            [
+                NN_test,
+                NN_TL_test,
+                NN_TLH_test,
+                NN_TLH_sampling_test,
+                NN_TLH_fifo_test,
+                NN_TLH_memories_test,
+                NN_TLH_mini_memories_test,
+                BR_HT_test,
+                LC_HT_test,
+                CC_HT_test,
+                BR_random_forest_test,
+                iSOUPtree_test,
+                baseline_last_class_test,
+                baseline_prior_distribution_test,
+                baseline_mean_test,
+                baseline_oracle_test,
+                baseline_1_NN_test,
+            ]
+        )
+        nemenyi_results = sp.posthoc_nemenyi(data)
+        np.savetxt("results/Nemenyi_{}.txt".format(metric), nemenyi_results)
+        output_file = workdir + "results/Friedman_{}.json".format(metric)
+        with open(output_file, "w") as outfile:
+            json.dump(friedman_results, outfile)
+    else:
+        print(f"No data available for metric {metric}. Skipping.")
 
 
 # Pour les métriques continual :
@@ -279,10 +268,10 @@ for metric in metrics_continual:
             "synthetic_rand",
             "Scene",
             "Yeast",
-            "Slashdot",
-            "Reuters-K500",
-            "20NG",
-            "Mediamill",
+            # "Slashdot",
+            # "Reuters-K500",
+            # "20NG",
+            # "Mediamill",
             "Avg. value",
         ],
     )
@@ -417,10 +406,10 @@ for metric in metrics_consumption:
             "synthetic_rand",
             "Scene",
             "Yeast",
-            "Slashdot",
-            "Reuters-K500",
-            "20NG",
-            "Mediamill",
+            # "Slashdot",
+            # "Reuters-K500",
+            # "20NG",
+            # "Mediamill",
             "Avg. value",
         ],
     )
@@ -521,7 +510,7 @@ i = 0
 texts = []
 for k, v in coord_consumption.items():
     print(k)
-    plt.scatter(coord_consumption[k][0], coord_consumption[k][1], c=color_list[i])
+    plt.scatter(coord_consumption[k][0], coord_consumption[k][1], c=color_list[i%len(color_list)])
     texts.append(
         plt.text(
             coord_consumption[k][0],
@@ -558,7 +547,7 @@ plt.figure(figsize=(10, 5), dpi=600)
 j = 0
 texts = []
 for k, v in coord_time.items():
-    plt.scatter(coord_time[k][0], coord_time[k][1], c=color_list[j])
+    plt.scatter(coord_time[k][0], coord_time[k][1], c=color_list[j%len(color_list)])
     texts.append(
         plt.text(
             coord_time[k][0],
